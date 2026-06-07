@@ -63,6 +63,21 @@ app.use('/api/super-admin', superAdminRoutes);
 
 const chatRoutes = require('./routes/chatRoutes');
 app.use('/api/chats', chatRoutes);
+
+// ✅ Download Windows App Route
+app.get('/api/download/windows-app', (req, res) => {
+    const filePath = path.join(__dirname, 'public', 'WindowsApp.zip');
+    res.download(filePath, 'LabManager_Windows.zip', (err) => {
+        if (err) {
+            console.error("Download failed:", err);
+            // Ignore headers sent error
+            if (!res.headersSent) {
+                res.status(404).send("File not found");
+            }
+        }
+    });
+});
+
 const { Server } = require('socket.io');
 
 const PORT = process.env.PORT || 5000;
