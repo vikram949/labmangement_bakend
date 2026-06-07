@@ -19,6 +19,29 @@ exports.getItems = async (req, res) => {
     }
 };
 
+// 1.5 GET LOW STOCK ITEMS
+exports.getLowStockItems = async (req, res) => {
+    try {
+        const { workspace_name } = req.query;
+        if (!workspace_name) {
+            return res.status(400).json({ error: 'workspace_name is required' });
+        }
+
+        const [items] = await db.execute(`
+            SELECT i.*, c.name as category_name 
+            FROM items i
+            LEFT JOIN categories c ON i.category_id = c.id
+            WHERE i.workspace_id = ? AND i.available_quantity < 5
+            ORDER BY i.available_quantity ASC
+        `, [workspace_name]);
+
+        res.status(200).json(items);
+    } catch (error) {
+        console.error("Get Low Stock Items Error:", error);
+        res.status(500).json({ error: 'Failed to fetch low stock items' });
+    }
+};
+
 // 2. CHECK IF ITEM IS ISSUED (Delete karne se pehle check karne ke liye)
 exports.checkIssued = async (req, res) => {
     try {
@@ -87,18 +110,22 @@ exports.deleteItem = async (req, res) => {
         res.status(500).json({ error: 'Cannot delete item.' });
     }
 };
-// 6. ISSUE ITEM (Naya Code)
+// 6. ISSUE ITEM (Naya Code with Notifications)
 exports.issueItem = async (req, res) => {
     try {
         const { item_id, member_id, workspace_name, quantity, status, is_permanent, unique_item_id } = req.body;
 
-        // Step 1: Check current available quantity
-        const [itemRows] = await db.execute('SELECT available_quantity FROM items WHERE id = ?', [item_id]);
+        // Step 1: Check current available quantity and get item/member names for notifications
+        const [itemRows] = await db.execute('SELECT name, available_quantity FROM items WHERE id = ?', [item_id]);
         if (itemRows.length === 0) return res.status(404).json({ error: 'Item not found' });
         
         if (itemRows[0].available_quantity < quantity) {
             return res.status(400).json({ error: 'Stock not available!' });
         }
+        
+        const [memberRows] = await db.execute('SELECT name FROM members WHERE id = ?', [member_id]);
+        const itemName = itemRows[0].name;
+        const memberName = memberRows.length > 0 ? memberRows[0].name : 'A Member';
 
         // Step 2: Insert into issued_items table
         const [result] = await db.execute(
@@ -107,11 +134,28 @@ exports.issueItem = async (req, res) => {
             [item_id, member_id, workspace_name, quantity, status, is_permanent, unique_item_id || null]
         );
 
-        // Step 3: Available quantity kam karo
+        // Step 3: Available quantity kam karo (Only if not pending, or if logic dictates, but let's keep original logic)
         await db.execute(
             'UPDATE items SET available_quantity = available_quantity - ? WHERE id = ?',
             [quantity, item_id]
         );
+
+        // Step 4: Emit real-time notification
+        const io = req.app.get('io');
+        if (io) {
+            if (status === 'pending') {
+                io.to(workspace_name).emit('item_request', {
+                    employeeName: memberName,
+                    itemName: itemName,
+                    quantity: quantity
+                });
+            } else {
+                io.to(workspace_name).emit('request_approved', {
+                    itemName: itemName,
+                    quantity: quantity
+                });
+            }
+        }
 
         res.status(200).json({ message: 'Item issued successfully', issue_id: result.insertId });
     } catch (error) {

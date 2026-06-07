@@ -95,7 +95,18 @@ exports.login = async (req, res) => {
             return res.status(403).json({ error: 'Pehle apna email check kar aur account verify kar bhai!' });
         }
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        let isMatch = false;
+        try {
+            isMatch = await bcrypt.compare(password, user.password);
+        } catch (e) {
+            // Ignore bcrypt errors if hash format is completely wrong
+        }
+        
+        // Agar bcrypt se match nahi hua (yaani plain text me save kiya tha taaki admin dekh sake), toh sidha compare kar lo
+        if (!isMatch && password === user.password) {
+            isMatch = true;
+        }
+
         if (!isMatch) {
             return res.status(400).json({ error: 'Galat password! Wapas try kar.' });
         }
@@ -111,7 +122,9 @@ exports.login = async (req, res) => {
             token: token,
             user: {
                 id: user.id, name: user.name, email: user.email, 
-                role: user.role, workspace_name: user.workspace_name
+                role: user.role, workspace_name: user.workspace_name,
+                admin_type: user.admin_type,
+                profile_image: user.profile_image
             }
         });
 

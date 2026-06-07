@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 
 // ✅ FIX YAHAN HAI: Is list mein 'bulkReturnItems' ko add karna zaroori hai!
-const { getItems, addItem, updateItem, deleteItem, checkIssued, issueItem, returnItem, bulkReturnItems } = require('../controllers/itemController');
+const { getItems, getLowStockItems, addItem, updateItem, deleteItem, checkIssued, issueItem, returnItem, bulkReturnItems } = require('../controllers/itemController');
 
 router.get('/', getItems);
+router.get('/low-stock', getLowStockItems);
 router.post('/', addItem);
 
 // Issuing & Returning
