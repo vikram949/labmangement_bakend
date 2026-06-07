@@ -58,9 +58,9 @@ exports.getAdminsList = async (req, res) => {
                 a.workspace_name as workspace_id, 
                 a.email, 
                 a.name,
-                a.role
+                a.admin_type as role
             FROM admins a
-            ORDER BY a.workspace_name, a.role
+            ORDER BY a.workspace_name, a.admin_type
         `);
         res.json(admins);
     } catch (error) {
