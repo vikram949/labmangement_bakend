@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid'); 
+const crypto = require('crypto');
+const uuidv4 = () => crypto.randomUUID();
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/emailService'); // Tera postman!
 
